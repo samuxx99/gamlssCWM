@@ -36,8 +36,8 @@
 #' @param famY A `gamlss` family object specifying the conditional
 #'   distribution of \eqn{Y | X} (e.g. [gamlss.dist::NO()]).
 #' @param init Character string indicating the initialization strategy:
-#'   `"kmeans"` (default) for hard *k*-means assignments, or
-#'   `"rand.soft"` for random row-normalised weights.
+#'   `"kmeans"` for hard *k*-means assignments, or
+#'   `"rand.soft"` (default) for random row-normalised weights.
 #' @param max_iter Maximum number of EM iterations.
 #' @param tol Convergence tolerance on the absolute change in
 #'   log-likelihood between consecutive iterations.  Defaults to `1e-3`.
@@ -47,7 +47,7 @@
 #'   component-membership probabilities.
 #' @param seed Optional integer. If provided, the RNG state is set at the
 #'   start of the fit and restored on exit for fully reproducible results.
-#' @param verbose Logical. If `TRUE` (default), a progress bar is shown
+#' @param verbose Logical. If `TRUE` (default), a progress bar is shown during EM iterations.
 #'
 #' @return An object of class `"gamlssCWM"`, which is a named list with
 #'   the following elements:
@@ -62,6 +62,8 @@
 #'     \item{`loglik`}{Scalar. Observed-data log-likelihood at convergence.}
 #'     \item{`ll_history`}{Numeric vector of log-likelihood values across
 #'       all EM iterations up to convergence.}
+#'     \item {`converged`}{Logical; \code{TRUE} if the EM algorithm reached 
+#'       the convergence criterion.} 
 #'     \item{`call`}{The `formula` argument (stored for use by S3
 #'       methods).}
 #'   }
@@ -128,9 +130,9 @@ gamlssCWM <- function(formula,
       paste(setdiff(vars, names(data)), collapse = ", ")
     )
   }
-  #if (!is.numeric(k) || length(k) != 1L || k < 2L || k != round(k)) {
-  #  stop("'k' must be an integer >= 2.")
-  #}
+  if (!is.numeric(k) || length(k) != 1L || k < 1L || k != round(k)) {
+    stop("'k' must be a positive integer (k >= 1).")
+  }
   if (nrow(data) <= k) {
     stop("'data' must have more rows than 'k'.")
   }
@@ -147,6 +149,26 @@ gamlssCWM <- function(formula,
   }
   init <- match.arg(init, c("kmeans", "rand.soft", "manual"))
   # --- end validation ---
+
+  formulas_health <- list(
+    sigma = sigma_formula,
+    nu = nu_formula,
+    tau = tau_formula
+  )
+
+  for (param in names(formulas_health)) {
+    has_formula <- deparse(formulas_health[[param]]) != "~1"
+    param_exists <- param %in% names(famY$parameters)
+
+    if (has_formula && !param_exists) {
+      warning(sprintf(
+        "Parameter '%s' is not in %s distribution and will be ignored",
+        param,
+        famY$family[1]
+      ), call. = FALSE) # Nota: aggiunto call. = FALSE per un output più pulito
+    }
+  }
+
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed)) {
       stop("'seed' must be a single finite numeric value.")
@@ -207,6 +229,7 @@ gamlssCWM <- function(formula,
       )
 
       loglik[r] <- compute_ll(M_out[[r]], data, formula, k)
+      if (r >= 3) M_out[r - 2] <- list(NULL)
     }
 
     converged_now <- if (r >= 3) {
@@ -226,7 +249,11 @@ gamlssCWM <- function(formula,
         setTxtProgressBar(pb, max_iter)
         close(pb)
       }
-      message(sprintf("EM converges at iteration %d", r))
+
+      if (verbose) {
+        message(sprintf("EM converges at iteration %d", r))
+      }
+
       converged <- TRUE
       break
     }
@@ -571,13 +598,12 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
 
   ## Density contours
   if (contours) {
+
     family_type <- function(fit_obj) {
       if (is.null(fit_obj)) {
         return("continuous")
       }
-      tolower(as.character(
-        get(fit_obj$family[1], envir = asNamespace("gamlss.dist"))()$type
-      ))
+      tolower(as.character(fit_obj$type %||% "continuous"))
     }
 
     has_non_continuous_family <- any(vapply(object$fits, function(comp_fit) {
@@ -637,7 +663,7 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
 #' @param dataY Numeric vector with the original \eqn{Y} data (used to set the grid range).
 #' @param theta Numeric specifying the azimuthal viewing angle. Default is 30.
 #' @param phi Numeric specifying the colatitude viewing angle. Default is 30.
-#' @param col Character string specifying the color of the surface. Default is \code{"lightblue"}.
+#' @param col Character string specifying the color of the surface. Default is \code{"white"}.
 #' @param border Character string specifying the color of the lines on the surface. Default is \code{"black"}.
 #' @param shade Numeric value specifying the shading of the surface. Default is \code{0.5}.
 #' @param xlab Character string for the x-axis label.
@@ -662,9 +688,7 @@ persp.gamlssCWM <- function(x, dataX, dataY,
     if (is.null(fit_obj)) {
       return("continuous")
     }
-    tolower(as.character(
-      get(fit_obj$family[1], envir = asNamespace("gamlss.dist"))()$type
-    ))
+    tolower(as.character(fit_obj$type %||% "continuous"))
   }
 
   has_non_continuous_family <- any(vapply(object$fits, function(comp_fit) {
@@ -766,28 +790,36 @@ summary.gamlssCWM <- function(object, ...) {
 
     # --- MODEL X ---
     fitX <- object$fits[[j]]$fitX
-    cat("-> MODEL X | Distribution: ", fitX$family[1], "\n", sep = "")
+    if (is.null(fitX)) {
+      cat("-> MODEL X | fit failed\n\n")
+    } else {
+      cat("-> MODEL X | Distribution: ", fitX$family[1], "\n", sep = "")
 
-    invisible(capture.output(sumX <- suppressWarnings(summary(fitX, save = TRUE))))
+      invisible(capture.output(sumX <- suppressWarnings(summary(fitX, save = TRUE))))
 
-    for (p in fitX$parameters) {
-      cat(sprintf("   * %s (link: %s)\n", p, fitX[[paste0(p, ".link")]]))
-      printCoefmat(sumX[[paste0(p, ".coef.table")]], signif.stars = TRUE, signif.legend = FALSE)
-      printed_any <- TRUE
-      cat("\n")
+      for (p in fitX$parameters) {
+        cat(sprintf("   * %s (link: %s)\n", p, fitX[[paste0(p, ".link")]]))
+        printCoefmat(sumX[[paste0(p, ".coef.table")]], signif.stars = TRUE, signif.legend = FALSE)
+        printed_any <- TRUE
+        cat("\n")
+      }
     }
 
     # --- MODEL Y ---
     fitY <- object$fits[[j]]$fitY
-    cat("-> MODEL Y | Distribution: ", fitY$family[1], "\n", sep = "")
+    if (is.null(fitY)) {
+      cat("-> MODEL Y | fit failed\n\n")
+    } else {
+      cat("-> MODEL Y | Distribution: ", fitY$family[1], "\n", sep = "")
 
-    invisible(capture.output(sumY <- suppressWarnings(summary(fitY, save = TRUE))))
+      invisible(capture.output(sumY <- suppressWarnings(summary(fitY, save = TRUE))))
 
-    for (p in fitY$parameters) {
-      cat(sprintf("   * %s (link: %s)\n", p, fitY[[paste0(p, ".link")]]))
-      printCoefmat(sumY[[paste0(p, ".coef.table")]], signif.stars = TRUE, signif.legend = FALSE)
-      printed_any <- TRUE
-      cat("\n")
+      for (p in fitY$parameters) {
+        cat(sprintf("   * %s (link: %s)\n", p, fitY[[paste0(p, ".link")]]))
+        printCoefmat(sumY[[paste0(p, ".coef.table")]], signif.stars = TRUE, signif.legend = FALSE)
+        printed_any <- TRUE
+        cat("\n")
+      }
     }
   }
 
@@ -816,7 +848,7 @@ logLik.gamlssCWM <- function(object, ...) {
 AIC.gamlssCWM <- function(object, ..., k = 2) {
   ll <- logLik(object)
   m <- attr(ll, "df")
-  2 * ll + k * m
+  -2 * as.numeric(ll) + k * m
 }
 
 #' @method BIC gamlssCWM
@@ -825,7 +857,7 @@ BIC.gamlssCWM <- function(object, ...) {
   ll <- logLik(object)
   m <- attr(ll, "df")
   n <- nobs(object)
-  2 * ll + log(n) * m
+  -2 * as.numeric(ll) + log(n) * m
 }
 
 #' @method nobs gamlssCWM

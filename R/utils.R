@@ -8,6 +8,35 @@
 # created inside safe_gamlss(); it is not a global variable.
 utils::globalVariables("weights_gamlss")
 
+# ---- Family Function Finder ------------------------------------
+
+#' Find a GAMLSS density function with fallback
+#'
+#' Searches for a GAMLSS density function (prefixed with "d") first within the
+#' \code{gamlss.dist} namespace. If not found, it falls back to searching the
+#' current search path and global environment (which is essential for custom or
+#' truncated families generated at runtime, e.g., via \code{gamlss.tr}).
+#' If the function cannot be located anywhere, it halts with an informative
+#' error message.
+#'
+#' @param fam_name Character string specifying the GAMLSS family name
+#'   (e.g., \code{"NO"}, \code{"GA"}, or a custom/truncated family name).
+#'
+#' @return The retrieved density function.
+#'
+#' @keywords internal
+find_dfun <- function(fam_name) {
+  fn <- paste0("d", fam_name)
+  dFUN <- get0(fn, envir = asNamespace("gamlss.dist"), mode = "function")
+  if (is.null(dFUN)) dFUN <- get0(fn, mode = "function")  # search path / global env
+  if (is.null(dFUN)) {
+    stop(sprintf(
+      "Density function '%s' not found. Family '%s' is not supported (load the package defining it or use a gamlss.dist family).",
+      fn, fam_name
+    ), call. = FALSE)
+  }
+  dFUN
+}
 
 # ---- Initialisation ----------------------------------------
 
@@ -86,16 +115,6 @@ cwm_init <- function(data, mode, k, nstart = 1, start.z = NULL, famX = NULL, fam
   return(z)
 }
 
-# Compatibility aliases retained for existing documentation.
-start <- function(data, mode, k) {
-  cwm_init(data = data, mode = mode, k = k)
-}
-
-get_gamlss_density_deprecated <- function(fit, x, newdata = NULL) {
-  get_gamlss_density(fit = fit, x_new = x, newdata = newdata)
-}
-
-
 # ---- Density evaluation (fitted values) --------------------
 
 #' Evaluate a GAMLSS fitted density at observed values
@@ -119,7 +138,7 @@ dens_gamlss <- function(fit, x) {
 
   fam_name <- fit$family[1]
 
-  dFUN <- get(paste0("d", fam_name), envir = asNamespace("gamlss.dist"))
+  dFUN <- find_dfun(fam_name)
 
   args <- names(formals(dFUN))
   par_list <- list(x = x)
@@ -185,6 +204,8 @@ safe_gamlss <- function(formula,
       # Apply this fix only for non-negative data to avoid masking genuine data issues.
       if (all(!is.na(y)) && all(y >= 0) && fam_obj$y.valid(pmax(y, 1e-5))) {
         data[[resp_var]] <- pmax(y, 1e-5)
+        warning(sprintf("Response '%s' contains values outside the support of family '%s'; shifted to 1e-5.",
+                resp_var, fam_obj$family[1]), call. = FALSE)
       }
     }
   }
@@ -315,25 +336,6 @@ M_step <- function(formula,
   fits <- vector(mode = "list", length = k)
   pi <- vector(mode = "numeric", length = k)
 
-  formulas_health <- list(
-    sigma = sigma_formula,
-    nu = nu_formula,
-    tau = tau_formula
-  )
-
-  for (param in names(formulas_health)) {
-    has_formula <- deparse(formulas_health[[param]]) != "~1"
-    param_exists <- param %in% names(famY$parameters)
-
-    if (has_formula && !param_exists) {
-      warning(sprintf(
-        "Parameter '%s' is not in %s distribution and will be ignored",
-        param,
-        famY$family[1]
-      ))
-    }
-  }
-
   for (j in 1:k) {
     prev_fitY <- NULL
     prev_fitX <- NULL
@@ -459,7 +461,7 @@ get_gamlss_density <- function(fit, x_new, newdata = NULL) {
   }
 
   fam_name <- fit$family[1]
-  dFUN <- get(paste0("d", fam_name), envir = asNamespace("gamlss.dist"))
+  dFUN <- find_dfun(fam_name)
   d_args <- names(formals(dFUN))
 
   # If newdata is not supplied, construct it from x_new using the model response name.
@@ -525,4 +527,17 @@ get_gamlss_density <- function(fit, x_new, newdata = NULL) {
   # Evaluate density values.
   dens <- suppressWarnings(do.call(dFUN, par_list))
   pmax(as.numeric(dens), 1e-10)
+}
+
+find_gamlss_obj <- function(name){
+  obj <- get0(name, envir = globalenv(), inherits = TRUE, mode = "function")
+  if(is.null(obj)){
+    obj <- get0(name, envir = asNamespace("gamlss.dist"), mode = "function")
+  }
+  if(is.null(obj)){
+    stop(sprintf("Unable to find ‘%s’. Please verify that the family/distribution is defined and loaded (e.g., via gamlss.tr::gen.trun() or library()).",
+      name
+    ))
+  }
+  obj
 }
