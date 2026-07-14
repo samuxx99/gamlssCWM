@@ -250,6 +250,7 @@ gamlssCWM <- function(formula,
         close(pb)
       }
 
+
       if (verbose) {
         message(sprintf("EM converges at iteration %d", r))
       }
