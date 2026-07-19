@@ -344,6 +344,8 @@ M_step <- function(formula,
       prev_fitX <- prev_fits[[j]]$fitX
     }
 
+    y_var <- data[[all.vars(formula)[1]]]
+
     fitY <- safe_gamlss(formula,
       sigma_formula,
       nu_formula,
@@ -353,13 +355,14 @@ M_step <- function(formula,
       prev_fit = prev_fitY
     )
 
-    if (!is.null(prev_fits) && !isTRUE(fitY$converged) && !is.null(prev_fitY)) {
-      message(sprintf("  [EM] Component %d fitY did not converge - rolling back to previous fit", j))
+    if (keep_prev(fitY, prev_fitY, z[, j], y_var)) {
+      message(sprintf("  [EM] Component %d fitY: log-likelihood decreased — rolling back to the previous fit", j))
       fitY <- prev_fitY
     }
 
     x_name <- all.vars(formula)[2]
     formulaX <- as.formula(paste(x_name, "~ 1"))
+    x_var <- data[[x_name]]
 
     fitX <- safe_gamlss(
       formula = formulaX,
@@ -369,12 +372,35 @@ M_step <- function(formula,
       prev_fit = prev_fitX
     )
 
-    if (!is.null(prev_fits) && !isTRUE(fitX$converged) && !is.null(prev_fitX)) {
-      # message(sprintf("  [EM] Component %d fitX did not converge - rolling back to previous fit", j))
+    if (keep_prev(fitX, prev_fitX, z[, j], x_var)) {
+      warning(sprintf("  [EM] Component %d fitX: log-likelihood decreased — rolling back to the previous fit", j), call. = FALSE)
       fitX <- prev_fitX
     }
 
+    # Some additional safe-guards
+    if (is.null(fitY) && !is.null(prev_fitY)) {
+      message(sprintf("  [EM] Component %d fitY failed with warm-start. Attempting cold-start...", j))
+      fitY <- safe_gamlss(formula, sigma_formula, nu_formula, tau_formula,
+                          data, z[, j], family = famY, prev_fit = NULL)
+    }
+
+    if (is.null(fitY)) {
+      stop(sprintf("Fit failed critically for component %d (Model Y). Stopping to avoid silent degeneration.", j))
+    }
+
+    if (is.null(fitX) && !is.null(prev_fitX)) {
+      fitX <- safe_gamlss(formulaX, data = data, z = z[, j], family = famX, prev_fit = NULL)
+    }
+    if (is.null(fitX)) {
+      stop(sprintf("Fit failed critically for component %d (Model X).", j))
+    }
+
     pi[j] <- sum(z[, j]) / nrow(data)
+    # Check if pi collapse
+    if (pi[j] < (k / nrow(data))) {
+       warning(sprintf("Component %d has lost almost all of its mass (pi = %f). The algorithm is collapsing into a lower-dimensional mixture.", j, pi[j]), call. = FALSE)
+       pi[j] <- 1e-8 
+    }
     fits[[j]] <- list(fitX = fitX, fitY = fitY)
   }
 
@@ -540,4 +566,35 @@ find_gamlss_obj <- function(name){
     ))
   }
   obj
+}
+
+#' Compare Two GAMLSS Fits Using a Weighted Log-Likelihood
+#'
+#' Determines whether the previous fit should be retained based on the
+#' weighted log-likelihood of the fitted densities.
+#'
+#' @param new_fit The newly obtained fitted model.
+#' @param prev_fit The previously retained fitted model.
+#' @param w A numeric vector of weights used to compute the weighted
+#'   log-likelihood.
+#' @param y The response values used to evaluate the fitted densities.
+#'
+#' @return A logical value indicating whether the previous fit should be
+#'   retained. Returns `TRUE` if `new_fit` is `NULL`, or if the weighted
+#'   log-likelihood of `prev_fit` is finite and greater than that of
+#'   `new_fit`; otherwise returns `FALSE`.
+#'
+#' @keywords internal
+keep_prev <- function(new_fit, prev_fit, w, y) {
+  if (is.null(new_fit)) return(TRUE)
+  if (is.null(prev_fit)) return(FALSE)
+
+  ll_new <- sum(
+    w * log(pmax(dens_gamlss(new_fit, y), .Machine$double.xmin))
+  )
+  ll_prev <- sum(
+    w * log(pmax(dens_gamlss(prev_fit, y), .Machine$double.xmin))
+  )
+
+  return(is.finite(ll_prev) && ll_prev > ll_new)
 }
