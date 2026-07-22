@@ -439,12 +439,12 @@ predict.gamlssCWM <- function(object, newdata, type = c("response", "posterior",
       x_new = newdata[[x_name]]
     )
 
-    # fitY models Y ~ X: pass full newdata so mu/sigma are predicted from X,
-    # then evaluate the conditional density at the observed Y values.
-    dens_y[, j] <- get_gamlss_density(object$fits[[j]]$fitY,
-      x_new   = newdata[[y_name]],
-      newdata = newdata
-    )
+    if (type == "joint") {
+      dens_y[, j] <- get_gamlss_density(object$fits[[j]]$fitY,
+        x_new   = newdata[[y_name]],
+        newdata = newdata
+      )
+    }
 
     if (needs_mu) {
       mu_y[, j] <- gamlss_predict_quiet(object$fits[[j]]$fitY,
@@ -582,6 +582,7 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
   ## Component-specific regression lines
   for (j in 1:k) {
     if (is.null(object$fits[[j]]$fitY)) next
+    if(!any(data$lab == j)) next
     x_grid <- seq(min(data$x[data$lab == j]), max(data$x[data$lab == j]), length.out = 200)
     nd <- setNames(data.frame(x_grid), x_name)
     mu_j <- try(
@@ -893,8 +894,14 @@ getIC.gamlssCWM <- function(object, ...) {
   # Information criteria
   aic <- -2 * ll + 2 * m
   aic3 <- -2 * ll + 3 * m
-  aicc <- aic + 2 * (m * (m + 1)) / (n - m - 1)
-  aicu <- aicc + n * log(n / (n - m - 1))
+
+  if (n - m - 1 <= 0) {
+    aicc <- NA_real_
+    aicu <- NA_real_
+  } else {
+    aicc <- aic + 2 * (m * (m + 1)) / (n - m - 1)
+    aicu <- aicc + n * log(n / (n - m - 1))
+  }
   caic <- -2 * ll + m * (1 + log(n))
   bic <- -2 * ll + m * log(n)
   awe <- -2 * ll + 2 * m * (1.5 + log(n))
@@ -909,5 +916,79 @@ icl <- bic - 2 * entropy
     AIC = aic, AIC3 = aic3, AICc = aicc, AICu = aicu,
     AWE = awe, BIC = bic, CAIC = caic, ICL = icl
   )
+  return(res)
+}
+
+#' Extract Model Coefficients from a Cluster-Weighted GAMLSS Model
+#'
+#' Extracts the estimated coefficients from a fitted \code{gamlssCWM} model.
+#' Because the model consists of multiple mixture components, each containing
+#' a marginal and a conditional GAMLSS model with potentially multiple 
+#' distributional parameters, the output is structured as a hierarchical list.
+#'
+#' @param object A fitted model of class \code{gamlssCWM}.
+#' @param ... Further arguments passed to or from other methods.
+#'
+#' @return A named list containing:
+#'   \describe{
+#'     \item{\code{pi}}{Numeric vector of the estimated mixing proportions.}
+#'     \item{\code{components}}{A list of length \code{k}. Each element corresponds 
+#'       to a mixture component and contains sub-lists \code{modelX} and \code{modelY} 
+#'       with the extracted coefficients for all active distributional parameters 
+#'       (e.g., \code{mu}, \code{sigma}, \code{nu}, \code{tau}).}
+#'   }
+#'
+#' @examples
+#' \dontshow{
+#' library(gamlss.dist)
+#' set.seed(42)
+#' df <- data.frame(x = rnorm(100), y = rnorm(100))
+#' fit <- gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(), k = 2, max_iter = 5)
+#' }
+#' coef(fit)
+#'
+#' @importFrom stats coef
+#' @method coef gamlssCWM
+#' @export
+coef.gamlssCWM <- function(object, ...) {
+  k <- length(object$fits)
+  res <- list(pi = object$pi)
+  
+  comp_list <- vector("list", k)
+  names(comp_list) <- paste0("Component_", seq_len(k))
+  
+  for (j in seq_len(k)) {
+    fitX <- object$fits[[j]]$fitX
+    fitY <- object$fits[[j]]$fitY
+    
+    comp_coefs <- list()
+    
+    # Extract coefficients for the marginal model (X)
+    if (!is.null(fitX)) {
+      cfX <- list()
+      for (p in fitX$parameters) {
+        # In gamlss, coef(fit, what="mu") extracts coefficients for parameter 'p'
+        cfX[[p]] <- stats::coef(fitX, what = p)
+      }
+      comp_coefs$modelX <- cfX
+    } else {
+      comp_coefs$modelX <- NA
+    }
+    
+    # Extract coefficients for the conditional model (Y | X)
+    if (!is.null(fitY)) {
+      cfY <- list()
+      for (p in fitY$parameters) {
+        cfY[[p]] <- stats::coef(fitY, what = p)
+      }
+      comp_coefs$modelY <- cfY
+    } else {
+      comp_coefs$modelY <- NA
+    }
+    
+    comp_list[[j]] <- comp_coefs
+  }
+  
+  res$components <- comp_list
   return(res)
 }

@@ -137,8 +137,14 @@ dens_gamlss <- function(fit, x) {
   }
 
   fam_name <- fit$family[1]
-
   dFUN <- find_dfun(fam_name)
+
+  fam_obj <- tryCatch(get(fam_name)(), error = function(e) NULL)
+  if (!is.null(fam_obj$y.valid) && !is.null(x)) {
+    if (!fam_obj$y.valid(x) && all(x >= 0, na.rm = TRUE)) {
+      x <- pmax(x, 1e-5)
+    }
+  }
 
   args <- names(formals(dFUN))
   par_list <- list(x = x)
@@ -344,6 +350,7 @@ M_step <- function(formula,
       prev_fitX <- prev_fits[[j]]$fitX
     }
 
+    # --- MODEL Y ---
     y_var <- data[[all.vars(formula)[1]]]
 
     fitY <- safe_gamlss(formula,
@@ -355,11 +362,28 @@ M_step <- function(formula,
       prev_fit = prev_fitY
     )
 
-    if (keep_prev(fitY, prev_fitY, z[, j], y_var)) {
-      message(sprintf("  [EM] Component %d fitY: log-likelihood decreased — rolling back to the previous fit", j))
+    # Fallback 1: cold-start
+    if (is.null(fitY) && !is.null(prev_fitY)) {
+      message(sprintf("  [EM] Component %d fitY failed with warm-start. Attempting cold-start...", j))
+      fitY <- safe_gamlss(formula, sigma_formula, nu_formula, tau_formula,
+                          data, z[, j], family = famY, prev_fit = NULL)
+    }
+
+    # Fallback 2: previous fit 
+    if (!is.null(fitY) && !is.null(prev_fitY)) {
+      if (keep_prev(fitY, prev_fitY, z[, j], y_var)) {
+        message(sprintf("  [EM] Component %d fitY: log-likelihood decreased — rolling back to the previous fit", j))
+        fitY <- prev_fitY
+      }
+    } else if (is.null(fitY) && !is.null(prev_fitY)) {
       fitY <- prev_fitY
     }
 
+    if (is.null(fitY)) {
+      stop(sprintf("Fit failed critically for component %d (Model Y). Stopping to avoid silent degeneration.", j))
+    }
+
+    # --- MODEL X ---
     x_name <- all.vars(formula)[2]
     formulaX <- as.formula(paste(x_name, "~ 1"))
     x_var <- data[[x_name]]
@@ -372,25 +396,21 @@ M_step <- function(formula,
       prev_fit = prev_fitX
     )
 
-    if (keep_prev(fitX, prev_fitX, z[, j], x_var)) {
-      warning(sprintf("  [EM] Component %d fitX: log-likelihood decreased — rolling back to the previous fit", j), call. = FALSE)
-      fitX <- prev_fitX
-    }
-
-    # Some additional safe-guards
-    if (is.null(fitY) && !is.null(prev_fitY)) {
-      message(sprintf("  [EM] Component %d fitY failed with warm-start. Attempting cold-start...", j))
-      fitY <- safe_gamlss(formula, sigma_formula, nu_formula, tau_formula,
-                          data, z[, j], family = famY, prev_fit = NULL)
-    }
-
-    if (is.null(fitY)) {
-      stop(sprintf("Fit failed critically for component %d (Model Y). Stopping to avoid silent degeneration.", j))
-    }
-
+    # Fallback 1: cold-start
     if (is.null(fitX) && !is.null(prev_fitX)) {
       fitX <- safe_gamlss(formulaX, data = data, z = z[, j], family = famX, prev_fit = NULL)
     }
+
+    # Fallback 2: previous fit 
+    if (!is.null(fitX) && !is.null(prev_fitX)) {
+      if (keep_prev(fitX, prev_fitX, z[, j], x_var)) {
+        warning(sprintf("  [EM] Component %d fitX: log-likelihood decreased — rolling back to the previous fit", j), call. = FALSE)
+        fitX <- prev_fitX
+      }
+    } else if (is.null(fitX) && !is.null(prev_fitX)) {
+      fitX <- prev_fitX
+    }
+
     if (is.null(fitX)) {
       stop(sprintf("Fit failed critically for component %d (Model X).", j))
     }
@@ -403,7 +423,7 @@ M_step <- function(formula,
     }
     fits[[j]] <- list(fitX = fitX, fitY = fitY)
   }
-
+  pi <- pi / sum(pi) # renorm pi
   return(list(fits = fits, pi = pi))
 }
 
