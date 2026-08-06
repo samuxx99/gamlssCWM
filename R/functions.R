@@ -114,7 +114,9 @@ gamlssCWM <- function(formula,
                       nstart = 1,
                       start.z = NULL, 
                       seed = NULL,
-                      verbose = TRUE) {
+                      method = "RS", 
+                      verbose = TRUE
+                    ) {
   # --- input validation ---
   if (!inherits(formula, "formula") || length(formula) != 3L) {
     stop("'formula' must be a two-sided formula, e.g. y ~ x.")
@@ -148,6 +150,7 @@ gamlssCWM <- function(formula,
     stop("'famX' and 'famY' must be gamlss.family objects, e.g. NO().")
   }
   init <- match.arg(init, c("kmeans", "rand.soft", "manual"))
+  method <- match.arg(method, c("RS", "CG", "mixed"))
   # --- end validation ---
 
   formulas_health <- list(
@@ -211,7 +214,8 @@ gamlssCWM <- function(formula,
         tau_formula = tau_formula,
         z = z, famX = famX, famY = famY,
         k = k, data = data,
-        prev_fits = NULL
+        prev_fits = NULL, 
+        method = method
       )
 
       loglik[r] <- compute_ll(M_out[[r]], data, formula, k)
@@ -225,7 +229,8 @@ gamlssCWM <- function(formula,
         tau_formula = tau_formula,
         z = z, famX = famX, famY = famY,
         k = k, data = data,
-        prev_fits = M_out[[r - 1]]$fits
+        prev_fits = M_out[[r - 1]]$fits, 
+        method = method 
       )
 
       loglik[r] <- compute_ll(M_out[[r]], data, formula, k)

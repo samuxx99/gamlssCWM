@@ -198,7 +198,8 @@ safe_gamlss <- function(formula,
                         sigma_formula = ~1,
                         nu_formula = ~1,
                         tau_formula = ~1,
-                        data, z, family, prev_fit = NULL, ...) {
+                        data, z, family, prev_fit = NULL,
+                        method = "RS", ...) {
   data$weights_gamlss <- pmax(as.numeric(z), 1e-8)
 
   # If the response violates family bounds, apply a minimal positive shift when safe.
@@ -240,6 +241,11 @@ safe_gamlss <- function(formula,
     list()
   })
 
+  method_expr <- switch(method, 
+                      RS    = quote(RS()), 
+                      CG    = quote(CG()), 
+                      mixed = quote(mixed()))
+
   gamlss_args <- c(list(
     formula = formula,
     sigma.formula = sigma_formula,
@@ -248,6 +254,7 @@ safe_gamlss <- function(formula,
     data = data,
     weights = data$weights_gamlss,
     family = family,
+    method = method_expr, 
     control = gamlss::gamlss.control(trace = FALSE, n.cyc = 500)
   ), start_args, list(...))
 
@@ -338,7 +345,7 @@ M_step <- function(formula,
                    sigma_formula,
                    nu_formula,
                    tau_formula,
-                   z, famX, famY, k, data, prev_fits = NULL) {
+                   z, famX, famY, k, data, prev_fits = NULL, method = "RS") {
   fits <- vector(mode = "list", length = k)
   pi <- vector(mode = "numeric", length = k)
 
@@ -359,14 +366,15 @@ M_step <- function(formula,
       tau_formula,
       data, z[, j],
       family = famY,
-      prev_fit = prev_fitY
+      prev_fit = prev_fitY, 
+      method = method 
     )
 
     # Fallback 1: cold-start
     if (is.null(fitY) && !is.null(prev_fitY)) {
       message(sprintf("  [EM] Component %d fitY failed with warm-start. Attempting cold-start...", j))
       fitY <- safe_gamlss(formula, sigma_formula, nu_formula, tau_formula,
-                          data, z[, j], family = famY, prev_fit = NULL)
+                          data, z[, j], family = famY, prev_fit = NULL, method = method)
     }
 
     # Fallback 2: previous fit 
@@ -393,12 +401,13 @@ M_step <- function(formula,
       data = data,
       z = z[, j],
       family = famX,
-      prev_fit = prev_fitX
+      prev_fit = prev_fitX, 
+      method = method
     )
 
     # Fallback 1: cold-start
     if (is.null(fitX) && !is.null(prev_fitX)) {
-      fitX <- safe_gamlss(formulaX, data = data, z = z[, j], family = famX, prev_fit = NULL)
+      fitX <- safe_gamlss(formulaX, data = data, z = z[, j], family = famX, prev_fit = NULL, method = method)
     }
 
     # Fallback 2: previous fit 
