@@ -62,7 +62,7 @@
 #'     \item{`loglik`}{Scalar. Observed-data log-likelihood at convergence.}
 #'     \item{`ll_history`}{Numeric vector of log-likelihood values across
 #'       all EM iterations up to convergence.}
-#'     \item {`converged`}{Logical; \code{TRUE} if the EM algorithm reached 
+#'     \item{`converged`}{Logical; \code{TRUE} if the EM algorithm reached 
 #'       the convergence criterion.} 
 #'     \item{`call`}{The `formula` argument (stored for use by S3
 #'       methods).}

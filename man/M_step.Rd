@@ -14,7 +14,8 @@ M_step(
   famY,
   k,
   data,
-  prev_fits = NULL
+  prev_fits = NULL,
+  method = "RS"
 )
 }
 \arguments{

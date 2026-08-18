@@ -31,7 +31,7 @@
 
 \item{phi}{Numeric specifying the colatitude viewing angle. Default is 30.}
 
-\item{col}{Character string specifying the color of the surface. Default is \code{"lightblue"}.}
+\item{col}{Character string specifying the color of the surface. Default is \code{"white"}.}
 
 \item{border}{Character string specifying the color of the lines on the surface. Default is \code{"black"}.}
 

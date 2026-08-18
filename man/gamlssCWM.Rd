@@ -19,6 +19,7 @@ gamlssCWM(
   nstart = 1,
   start.z = NULL,
   seed = NULL,
+  method = "RS",
   verbose = TRUE
 )
 }
@@ -46,8 +47,8 @@ distribution of \eqn{X} (e.g. \code{\link[gamlss.dist:NO]{gamlss.dist::NO()}}).}
 distribution of \eqn{Y | X} (e.g. \code{\link[gamlss.dist:NO]{gamlss.dist::NO()}}).}
 
 \item{init}{Character string indicating the initialization strategy:
-\code{"kmeans"} (default) for hard \emph{k}-means assignments, or
-\code{"rand.soft"} for random row-normalised weights.}
+\code{"kmeans"} for hard \emph{k}-means assignments, or
+\code{"rand.soft"} (default) for random row-normalised weights.}
 
 \item{max_iter}{Maximum number of EM iterations.}
 
@@ -64,7 +65,7 @@ component-membership probabilities.}
 \item{seed}{Optional integer. If provided, the RNG state is set at the
 start of the fit and restored on exit for fully reproducible results.}
 
-\item{verbose}{Logical. If \code{TRUE} (default), a progress bar is shown}
+\item{verbose}{Logical. If \code{TRUE} (default), a progress bar is shown during EM iterations.}
 }
 \value{
 An object of class \code{"gamlssCWM"}, which is a named list with
@@ -80,6 +81,8 @@ component-membership probabilities.}
 \item{\code{loglik}}{Scalar. Observed-data log-likelihood at convergence.}
 \item{\code{ll_history}}{Numeric vector of log-likelihood values across
 all EM iterations up to convergence.}
+\item{\code{converged}}{Logical; \code{TRUE} if the EM algorithm reached 
+the convergence criterion.}
 \item{\code{call}}{The \code{formula} argument (stored for use by S3
 methods).}
 }

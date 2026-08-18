@@ -13,6 +13,7 @@ safe_gamlss(
   z,
   family,
   prev_fit = NULL,
+  method = "RS",
   ...
 )
 }
