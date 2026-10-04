@@ -38,6 +38,39 @@ find_dfun <- function(fam_name) {
   dFUN
 }
 
+#' Reject unsupported GAMLSS family types
+#'
+#' The \pkg{gamlssCWM} model specification (see the package's reference
+#' article) is restricted to continuous distributions and discrete count
+#' distributions: families of type `"Mixed"` (e.g. `BEINF()`) and discrete
+#' families with a fixed binomial denominator (e.g. `BI()`, `BB()`, which
+#' require a `bd` argument) are not supported.
+#'
+#' @param fam A `gamlss.family` object.
+#' @param label Character string naming the argument, used in the error
+#'   message (e.g. `"famX"`).
+#'
+#' @return Invisibly `NULL`; called for its side effect of raising an
+#'   informative error when `fam` is unsupported.
+#'
+#' @keywords internal
+validate_family_type <- function(fam, label) {
+  if (identical(fam$type, "Mixed")) {
+    stop(sprintf(
+      "'%s' has type \"Mixed\" (e.g. BEINF()), which is not supported by gamlssCWM().",
+      label
+    ), call. = FALSE)
+  }
+  dFUN <- find_dfun(fam$family[1])
+  if ("bd" %in% names(formals(dFUN))) {
+    stop(sprintf(
+      "'%s' is a fixed-denominator family (requires 'bd', e.g. BI(), BB()), which is not supported by gamlssCWM().",
+      label
+    ), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
 # ---- Initialisation ----------------------------------------
 
 #' Initialize the Posterior Membership Matrix
@@ -68,12 +101,15 @@ cwm_init <- function(data, mode, k, nstart = 1, start.z = NULL, famX = NULL, fam
   }
 
   if (mode == "kmeans") {
-    if (!is.null(famX) && !is.null(famY) && famX$type == "Continuous" && famY$type == "Continuous") {
+    # kmeans clusters on raw Euclidean distance, which only requires numeric
+    # data -- it does not actually require continuous families (it works
+    # fine, and often helps, for discrete/count responses too).
+    if (ncol(data) > 0 && all(vapply(data, is.numeric, logical(1)))) {
       res <- kmeans(data, centers = k, nstart = max(1, nstart))
       z <- as.matrix(model.matrix(~ factor(res$cluster) - 1))
       dimnames(z) <- NULL
     } else {
-      warning("kmeans is only valid for continuous data -> switching to 'rand.soft'")
+      warning("kmeans requires numeric data -> switching to 'rand.soft'")
       mode <- "rand.soft"
     }
   }
@@ -113,6 +149,65 @@ cwm_init <- function(data, mode, k, nstart = 1, start.z = NULL, famX = NULL, fam
   }
 
   return(z)
+}
+
+#' Short-EM initialization selection
+#'
+#' Implements the "short EM runs" initialization strategy of Biernacki,
+#' Celeux & Govaert (2003): runs `nstart` independent EM sequences of
+#' `short_iterations` iterations each, starting from independent
+#' `"rand.soft"` random draws, and keeps the posterior membership matrix
+#' from the run reaching the highest observed-data log-likelihood after
+#' those `short_iterations` iterations. Unlike plain `"rand.soft"` with
+#' `nstart > 1` (which only picks the *sharpest* random initial guess,
+#' irrespective of fit quality), this selects on the actual mixture
+#' log-likelihood, giving `nstart` a real chance at escaping poor local
+#' optima.
+#'
+#' @inheritParams M_step
+#' @param nstart Integer. Number of independent short-EM sequences to run.
+#' @param short_iterations Integer. Number of EM iterations per sequence.
+#'
+#' @return An \eqn{n \times k} numeric matrix of posterior probabilities,
+#'   to be used as the initial `z` for the full EM run.
+#'
+#' @keywords internal
+short_em_select <- function(data, formula, sigma_formula, nu_formula, tau_formula,
+                            famX, famY, k, nstart, short_iterations, method) {
+  best_z <- NULL
+  best_ll <- -Inf
+
+  for (s in seq_len(nstart)) {
+    z <- cwm_init(data = data[all.vars(formula)], mode = "rand.soft", k = k, famX = famX, famY = famY)
+    M_out <- NULL
+    ll <- -Inf
+
+    short_run <- try(suppressMessages(suppressWarnings({
+      for (r in seq_len(short_iterations)) {
+        if (r > 1) z <- E_step(M_out, data = data, k = k, formula = formula)
+        M_out <- M_step(
+          formula = formula, sigma_formula = sigma_formula,
+          nu_formula = nu_formula, tau_formula = tau_formula,
+          z = z, famX = famX, famY = famY, k = k, data = data,
+          prev_fits = if (r > 1) M_out$fits else NULL, method = method
+        )
+        ll <- compute_ll(M_out, data, formula, k)
+      }
+    })), silent = TRUE)
+
+    if (!inherits(short_run, "try-error") && is.finite(ll) && ll > best_ll) {
+      best_ll <- ll
+      best_z <- E_step(M_out, data = data, k = k, formula = formula)
+    }
+  }
+
+  if (is.null(best_z)) {
+    # Every short run failed critically: fall back to a single plain draw,
+    # the full EM loop's own fallbacks will take it from there.
+    best_z <- cwm_init(data = data[all.vars(formula)], mode = "rand.soft", k = k, famX = famX, famY = famY)
+  }
+
+  best_z
 }
 
 # ---- Density evaluation (fitted values) --------------------
@@ -331,13 +426,18 @@ E_step <- function(M_out, data, k, formula) {
 #' @param k Integer. Number of mixture components.
 #' @param data A `data.frame` with the observed variables.
 #'
-#' @return A named list with two elements:
+#' @return A named list with three elements:
 #'   \describe{
 #'     \item{`fits`}{A length-`k` list; each element is itself a list with
 #'       `$fitX` (marginal fit for `X`) and `$fitY` (conditional fit for
 #'       `Y | X`).}
 #'     \item{`pi`}{Numeric vector of length `k` with updated mixing
 #'       proportions.}
+#'     \item{`n_retained`}{A list with integer counts `fitX` and `fitY`:
+#'       the number of components (out of `k`) in this M-step call whose
+#'       `fitX`/`fitY` update was rejected by the GEM safeguard (the
+#'       candidate fit had lower weighted log-likelihood than the previous
+#'       iterate) and the previous fit was retained instead.}
 #'   }
 #'
 #' @keywords internal
@@ -348,6 +448,8 @@ M_step <- function(formula,
                    z, famX, famY, k, data, prev_fits = NULL, method = "RS") {
   fits <- vector(mode = "list", length = k)
   pi <- vector(mode = "numeric", length = k)
+  n_retained_fitX <- 0L
+  n_retained_fitY <- 0L
 
   for (j in 1:k) {
     prev_fitY <- NULL
@@ -380,7 +482,7 @@ M_step <- function(formula,
     # Fallback 2: previous fit 
     if (!is.null(fitY) && !is.null(prev_fitY)) {
       if (keep_prev(fitY, prev_fitY, z[, j], y_var)) {
-        message(sprintf("  [EM] Component %d fitY: log-likelihood decreased — rolling back to the previous fit", j))
+        n_retained_fitY <- n_retained_fitY + 1L
         fitY <- prev_fitY
       }
     } else if (is.null(fitY) && !is.null(prev_fitY)) {
@@ -413,7 +515,7 @@ M_step <- function(formula,
     # Fallback 2: previous fit 
     if (!is.null(fitX) && !is.null(prev_fitX)) {
       if (keep_prev(fitX, prev_fitX, z[, j], x_var)) {
-        warning(sprintf("  [EM] Component %d fitX: log-likelihood decreased — rolling back to the previous fit", j), call. = FALSE)
+        n_retained_fitX <- n_retained_fitX + 1L
         fitX <- prev_fitX
       }
     } else if (is.null(fitX) && !is.null(prev_fitX)) {
@@ -433,7 +535,8 @@ M_step <- function(formula,
     fits[[j]] <- list(fitX = fitX, fitY = fitY)
   }
   pi <- pi / sum(pi) # renorm pi
-  return(list(fits = fits, pi = pi))
+  return(list(fits = fits, pi = pi,
+              n_retained = list(fitX = n_retained_fitX, fitY = n_retained_fitY)))
 }
 
 
@@ -492,6 +595,77 @@ gamlss_predict_quiet <- function(object, what = "mu", ...) {
   )
 }
 
+#' Safely predict one GAMLSS distributional parameter at new data
+#'
+#' Wraps `predict.gamlss()` (via [stats::predict()]) for a single distributional parameter
+#' (`mu`, `sigma`, `nu` or `tau`) with a fallback for cases where the
+#' underlying `predict.gamlss()` call fails or returns a mismatched length.
+#' This happens in particular for some smoothing terms (notably `pb()`)
+#' whose "safe prediction" re-fit mechanism can error with an unrelated
+#' `object 'what' not found` message when the model was fitted
+#' programmatically (as `gamlssCWM` does via [safe_gamlss()]). When this
+#' happens, the fallback linearly interpolates the in-sample fitted values
+#' against the single right-hand-side covariate (when there is exactly one),
+#' or otherwise falls back to the first in-sample fitted value.
+#'
+#' @param fit A fitted `gamlss` object.
+#' @param param Character string; one of `"mu"`, `"sigma"`, `"nu"`, `"tau"`.
+#' @param newdata A `data.frame` of covariates for out-of-sample prediction
+#'   (the response column, if present, is ignored).
+#' @param n_new Integer; the number of rows predictions are required for
+#'   (i.e. `nrow(newdata)`).
+#'
+#' @return Numeric vector of length `n_new` with predicted parameter values.
+#'
+#' @importFrom stats formula approx
+#' @keywords internal
+safe_predict_param <- function(fit, param, newdata, n_new) {
+  pred_newdata <- as.data.frame(newdata)
+  resp_var <- all.vars(formula(fit))[1]
+  if (resp_var %in% names(pred_newdata)) {
+    pred_newdata[[resp_var]] <- NULL
+  }
+  if (ncol(pred_newdata) == 0) {
+    pred_newdata <- data.frame(.dummy = rep(0, n_new))
+  }
+
+  fv_name <- paste0(param, ".fv")
+  fv <- fit[[fv_name]]
+
+  pred_p <- try(
+    gamlss_predict_quiet(
+      fit,
+      what = param,
+      newdata = pred_newdata,
+      data = fit$data,
+      type = "response"
+    ),
+    silent = TRUE
+  )
+
+  if (inherits(pred_p, "try-error") || length(pred_p) != n_new) {
+    x_rhs_vars <- all.vars(formula(fit)[[3]])
+    can_interpolate <-
+      !is.null(fv) &&
+      length(fv) == nrow(fit$data) &&
+      length(x_rhs_vars) == 1 &&
+      x_rhs_vars %in% names(pred_newdata) &&
+      x_rhs_vars %in% names(fit$data)
+
+    if (can_interpolate) {
+      x_train <- fit$data[[x_rhs_vars]]
+      x_out <- pred_newdata[[x_rhs_vars]]
+      pred_p <- approx(x = x_train, y = fv, xout = x_out, rule = 2, ties = mean)$y
+    } else if (!is.null(fv) && length(fv) > 0) {
+      pred_p <- rep(fv[1], n_new)
+    } else {
+      pred_p <- rep(0, n_new)
+    }
+  }
+
+  as.numeric(pred_p)
+}
+
 #' Evaluate a GAMLSS density at new points
 #'
 #' Evaluates the density of a fitted `gamlss` distribution at `x_new`
@@ -526,56 +700,12 @@ get_gamlss_density <- function(fit, x_new, newdata = NULL) {
     newdata <- setNames(data.frame(x_new), resp_var)
   }
 
-  # predict() requires covariates only (exclude the response if present).
-  pred_newdata <- as.data.frame(newdata)
-  resp_var <- all.vars(formula(fit))[1]
-  if (resp_var %in% names(pred_newdata)) {
-    pred_newdata[[resp_var]] <- NULL
-  }
-  if (ncol(pred_newdata) == 0) {
-    pred_newdata <- data.frame(.dummy = rep(0, length(x_new)))
-  }
-
   # Predict parameters separately to avoid predictAll row-count mismatches
   # when newdata has a different size from the training data.
   par_list <- list(x = x_new)
   for (p in c("mu", "sigma", "nu", "tau")) {
     if (p %in% fit$parameters && p %in% d_args) {
-      fv_name <- paste0(p, ".fv")
-      fv <- fit[[fv_name]]
-
-      pred_p <- try(
-        gamlss_predict_quiet(
-          fit,
-          what = p,
-          newdata = pred_newdata,
-          data = fit$data,
-          type = "response"
-        ),
-        silent = TRUE
-      )
-
-      if (inherits(pred_p, "try-error") || length(pred_p) != length(x_new)) {
-        x_rhs_vars <- all.vars(formula(fit)[[3]])
-        can_interpolate <-
-          !is.null(fv) &&
-          length(fv) == nrow(fit$data) &&
-          length(x_rhs_vars) == 1 &&
-          x_rhs_vars %in% names(pred_newdata) &&
-          x_rhs_vars %in% names(fit$data)
-
-        if (can_interpolate) {
-          x_train <- fit$data[[x_rhs_vars]]
-          x_out <- pred_newdata[[x_rhs_vars]]
-          pred_p <- approx(x = x_train, y = fv, xout = x_out, rule = 2, ties = mean)$y
-        } else if (!is.null(fv) && length(fv) > 0) {
-          pred_p <- rep(fv[1], length(x_new))
-        } else {
-          pred_p <- rep(0, length(x_new))
-        }
-      }
-
-      par_list[[p]] <- pred_p
+      par_list[[p]] <- safe_predict_param(fit, p, newdata, length(x_new))
     }
   }
 
@@ -590,7 +720,7 @@ find_gamlss_obj <- function(name){
     obj <- get0(name, envir = asNamespace("gamlss.dist"), mode = "function")
   }
   if(is.null(obj)){
-    stop(sprintf("Unable to find ‘%s’. Please verify that the family/distribution is defined and loaded (e.g., via gamlss.tr::gen.trun() or library()).",
+    stop(sprintf("Unable to find '%s'. Please verify that the family/distribution is defined and loaded (e.g., via gamlss.tr::gen.trun() or library()).",
       name
     ))
   }
@@ -609,9 +739,13 @@ find_gamlss_obj <- function(name){
 #' @param y The response values used to evaluate the fitted densities.
 #'
 #' @return A logical value indicating whether the previous fit should be
-#'   retained. Returns `TRUE` if `new_fit` is `NULL`, or if the weighted
-#'   log-likelihood of `prev_fit` is finite and greater than that of
-#'   `new_fit`; otherwise returns `FALSE`.
+#'   retained. Returns `TRUE` if `new_fit` is `NULL`, if the weighted
+#'   log-likelihood of `new_fit` is not finite, or if the (finite) weighted
+#'   log-likelihood of `prev_fit` exceeds that of `new_fit` by more than a
+#'   numerical tolerance (`sqrt(.Machine$double.eps) * max(1, abs(ll_prev))`,
+#'   to absorb floating-point/inner-solver noise near convergence); otherwise
+#'   returns `FALSE`. The weighted log-likelihood itself is not penalized or
+#'   adjusted in any way -- only the comparison is tolerance-based.
 #'
 #' @keywords internal
 keep_prev <- function(new_fit, prev_fit, w, y) {
@@ -625,5 +759,6 @@ keep_prev <- function(new_fit, prev_fit, w, y) {
     w * log(pmax(dens_gamlss(prev_fit, y), .Machine$double.xmin))
   )
 
-  return(is.finite(ll_prev) && ll_prev > ll_new)
+  if (!is.finite(ll_new)) return(TRUE)
+  is.finite(ll_prev) && (ll_prev - ll_new) > sqrt(.Machine$double.eps) * max(1, abs(ll_prev))
 }

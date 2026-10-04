@@ -18,9 +18,13 @@ log-likelihood.}
 }
 \value{
 A logical value indicating whether the previous fit should be
-retained. Returns \code{TRUE} if \code{new_fit} is \code{NULL}, or if the weighted
-log-likelihood of \code{prev_fit} is finite and greater than that of
-\code{new_fit}; otherwise returns \code{FALSE}.
+retained. Returns \code{TRUE} if \code{new_fit} is \code{NULL}, if the weighted
+log-likelihood of \code{new_fit} is not finite, or if the (finite) weighted
+log-likelihood of \code{prev_fit} exceeds that of \code{new_fit} by more than a
+numerical tolerance (\code{sqrt(.Machine$double.eps) * max(1, abs(ll_prev))},
+to absorb floating-point/inner-solver noise near convergence); otherwise
+returns \code{FALSE}. The weighted log-likelihood itself is not penalized or
+adjusted in any way -- only the comparison is tolerance-based.
 }
 \description{
 Determines whether the previous fit should be retained based on the

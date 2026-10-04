@@ -6,9 +6,11 @@
 ^docs$
 ^output$
 ^\.Rhistory$
+^\.claude$
 ^\.Rcheck$
 ^\.\.Rcheck$
 ^\.DS_Store$
 ^R/\.RData$
 ^R/\.RDataTmp$
 ^scripts$
+^.*\.tar\.gz$

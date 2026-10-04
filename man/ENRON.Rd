@@ -16,7 +16,8 @@ original rsafd dataset.
 ENRON
 }
 \description{
-Dati tratti dal pacchetto rsafd della Princeton University.
+Data taken from the \code{rsafd} package developed at Princeton
+University.
 }
 \note{
 Original dataset license: MIT.

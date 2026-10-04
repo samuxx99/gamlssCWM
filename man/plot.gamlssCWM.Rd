@@ -16,7 +16,8 @@
   drawlabels = FALSE,
   main = "",
   ylab = NULL,
-  xlab = NULL
+  xlab = NULL,
+  legend = NULL
 )
 }
 \arguments{
@@ -51,6 +52,10 @@ corresponding density values. Defaults to \code{FALSE}.}
 \item{ylab}{Label for the \eqn{y}-axis.  Defaults to \code{"Y"}.}
 
 \item{xlab}{Label for the \eqn{x}-axis.  Defaults to \code{"X"}.}
+
+\item{legend}{Optional character string giving the position of a
+legend that maps colors to component numbers, as in summary(), e.g.
+"topleft". If NULL (default), no legend is drawn.}
 }
 \value{
 Invisibly returns \code{NULL}.  Called for its side-effect of
@@ -87,6 +92,13 @@ plot(fit,
   dataX = df$x, dataY = df$y,
   col = c("steelblue", "tomato"), pch = 16,
   main = "Cluster-Weighted GAMLSS fit"
+)
+
+plot(fit,
+  dataX = df$x, dataY = df$y,
+  col = c("steelblue", "tomato"), pch = 16,
+  main = "Cluster-Weighted GAMLSS fit",
+  legend = "topleft"
 )
 
 }

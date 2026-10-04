@@ -34,7 +34,7 @@ df_new <- data.frame(
 test_that("gamlssCWM returns correct class and structure", {
   expect_s3_class(fit, "gamlssCWM")
   expect_named(fit, c("fits", "pi", "posteriors", "loglik",
-                      "ll_history", "converged", "call"),
+                      "ll_history", "converged", "call", "n_retained"),
                ignore.order = TRUE)
 })
 
@@ -140,11 +140,43 @@ test_that("plot warns and skips contours with discrete families", {
   )
 })
 
+# ---- 12b. plot legend argument ------------------------------
+test_that("plot draws a legend at a valid position without error", {
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  expect_no_error(
+    plot(fit,
+      dataX = df$x,
+      dataY = df$y,
+      col = c("steelblue", "tomato"),
+      pch = 16,
+      legend = "topleft"
+    )
+  )
+})
+
+test_that("plot errors on an invalid legend argument", {
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  expect_error(
+    plot(fit,
+      dataX = df$x,
+      dataY = df$y,
+      col = c("steelblue", "tomato"),
+      pch = 16,
+      legend = TRUE
+    ),
+    regexp = "'legend' must be NULL or a legend position string"
+  )
+})
+
 # ---- 13. Input validation errors ---------------------------
 test_that("gamlssCWM validates inputs correctly", {
   expect_error(
-    gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(), k = 1L, max_iter = 5L),
-    "'k' must be an integer"
+    gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(), k = 0L, max_iter = 5L),
+    "'k' must be a positive integer"
   )
   expect_error(
     gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(), k = 2L, max_iter = 0L),
@@ -194,24 +226,24 @@ test_that("gamlssCWM works with rand.soft initialization", {
 })
 
 # ---- 16. safe_gamlss failure handling ----------------------
-test_that("safe_gamlss returns gracefully when gamlss fails", {
-  # LOGNO requires positive response, but df$x has negative values.
-  # This will cause gamlss to fail for X, which safe_gamlss catches.
-  suppressWarnings({
-    fit_fail <- gamlssCWM(
-      formula = y ~ x,
-      data = df,
-      famX = LOGNO(),
-      famY = NO(),
-      k = 2L,
-      max_iter = 5L
+test_that("gamlssCWM stops with an informative error when a fit fails on iteration 1", {
+  # LOGNO requires positive response, but df$x has negative values, so
+  # safe_gamlss() returns NULL for fitX. With no previous fit to roll
+  # back to (first iteration), M_step() stops rather than silently
+  # returning a degenerate component.
+  suppressWarnings(
+    expect_error(
+      gamlssCWM(
+        formula = y ~ x,
+        data = df,
+        famX = LOGNO(),
+        famY = NO(),
+        k = 2L,
+        max_iter = 5L
+      ),
+      "Fit failed critically"
     )
-  })
-  
-  expect_s3_class(fit_fail, "gamlssCWM")
-  # The fits should be marked as NULL for X elements if it fails,
-  # leading to "failed" prints if print is called.
-  expect_null(fit_fail$fits[[1]]$fitX)
+  )
 })
 
 # ---- 17. getIC function -----------------------------------

@@ -39,13 +39,18 @@ M_step(
 \item{data}{A \code{data.frame} with the observed variables.}
 }
 \value{
-A named list with two elements:
+A named list with three elements:
 \describe{
 \item{\code{fits}}{A length-\code{k} list; each element is itself a list with
 \verb{$fitX} (marginal fit for \code{X}) and \verb{$fitY} (conditional fit for
 \code{Y | X}).}
 \item{\code{pi}}{Numeric vector of length \code{k} with updated mixing
 proportions.}
+\item{\code{n_retained}}{A list with integer counts \code{fitX} and \code{fitY}:
+the number of components (out of \code{k}) in this M-step call whose
+\code{fitX}/\code{fitY} update was rejected by the GEM safeguard (the
+candidate fit had lower weighted log-likelihood than the previous
+iterate) and the previous fit was retained instead.}
 }
 }
 \description{

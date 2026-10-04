@@ -17,6 +17,7 @@ gamlssCWM(
   tol = 0.001,
   k,
   nstart = 1,
+  short_iterations = 5,
   start.z = NULL,
   seed = NULL,
   method = "RS",
@@ -47,8 +48,10 @@ distribution of \eqn{X} (e.g. \code{\link[gamlss.dist:NO]{gamlss.dist::NO()}}).}
 distribution of \eqn{Y | X} (e.g. \code{\link[gamlss.dist:NO]{gamlss.dist::NO()}}).}
 
 \item{init}{Character string indicating the initialization strategy:
-\code{"kmeans"} for hard \emph{k}-means assignments, or
-\code{"rand.soft"} (default) for random row-normalised weights.}
+\code{"kmeans"} for hard \emph{k}-means assignments on the raw \verb{(x, y)} values
+(works for discrete/count families too, since it only requires
+numeric data), or \code{"rand.soft"} (default) for random row-normalised
+weights.}
 
 \item{max_iter}{Maximum number of EM iterations.}
 
@@ -57,13 +60,28 @@ log-likelihood between consecutive iterations.  Defaults to \code{1e-3}.}
 
 \item{k}{Integer. Number of mixture components.}
 
-\item{nstart}{Integer. Number of random starts for the initialization.}
+\item{nstart}{Integer. Number of independent initializations to try
+when \code{init = "rand.soft"}. When \code{nstart > 1}, a short-EM selection
+(Biernacki, Celeux & Govaert, 2003) is used: \code{nstart} short EM
+sequences of \code{short_iterations} iterations each are run from
+independent random starts, and the one reaching the highest
+log-likelihood is kept to initialize the full EM run. With
+\code{nstart = 1} (default), a single random-soft draw is used directly,
+with no short-EM selection.}
+
+\item{short_iterations}{Integer. Number of EM iterations run for each
+candidate start when \code{nstart > 1} (see \code{nstart}). Defaults to \code{5}.
+Ignored when \code{nstart = 1} or \code{init != "rand.soft"}.}
 
 \item{start.z}{Optional \eqn{n \times k} numeric matrix of initial
 component-membership probabilities.}
 
 \item{seed}{Optional integer. If provided, the RNG state is set at the
 start of the fit and restored on exit for fully reproducible results.}
+
+\item{method}{Character string selecting the \code{gamlss} fitting algorithm
+used in every M-step call: \code{"RS"} (Rigby and Stasinopoulos, default),
+\code{"CG"} (Cole and Green), or \code{"mixed"}.}
 
 \item{verbose}{Logical. If \code{TRUE} (default), a progress bar is shown during EM iterations.}
 }
@@ -85,6 +103,14 @@ all EM iterations up to convergence.}
 the convergence criterion.}
 \item{\code{call}}{The \code{formula} argument (stored for use by S3
 methods).}
+\item{\code{n_retained}}{A list with integer counts \code{fitX}, \code{fitY}, and
+\code{total}: the number of M-step updates, summed over all EM
+iterations, where the GEM safeguard rejected a candidate \code{fitX}
+or \code{fitY} fit (because its weighted log-likelihood was lower
+than the previous iterate's) and retained the previous fit
+instead. A nonzero count is expected and harmless for families
+with shape parameters (e.g. \code{PE()}, \code{BCPE()}) fitted via \code{"RS"},
+whose convergence is not strictly monotone cycle-to-cycle.}
 }
 }
 \description{

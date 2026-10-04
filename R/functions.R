@@ -36,17 +36,32 @@
 #' @param famY A `gamlss` family object specifying the conditional
 #'   distribution of \eqn{Y | X} (e.g. [gamlss.dist::NO()]).
 #' @param init Character string indicating the initialization strategy:
-#'   `"kmeans"` for hard *k*-means assignments, or
-#'   `"rand.soft"` (default) for random row-normalised weights.
+#'   `"kmeans"` for hard *k*-means assignments on the raw `(x, y)` values
+#'   (works for discrete/count families too, since it only requires
+#'   numeric data), or `"rand.soft"` (default) for random row-normalised
+#'   weights.
 #' @param max_iter Maximum number of EM iterations.
 #' @param tol Convergence tolerance on the absolute change in
 #'   log-likelihood between consecutive iterations.  Defaults to `1e-3`.
 #' @param k Integer. Number of mixture components.
-#' @param nstart Integer. Number of random starts for the initialization.
+#' @param nstart Integer. Number of independent initializations to try
+#'   when `init = "rand.soft"`. When `nstart > 1`, a short-EM selection
+#'   (Biernacki, Celeux & Govaert, 2003) is used: `nstart` short EM
+#'   sequences of `short_iterations` iterations each are run from
+#'   independent random starts, and the one reaching the highest
+#'   log-likelihood is kept to initialize the full EM run. With
+#'   `nstart = 1` (default), a single random-soft draw is used directly,
+#'   with no short-EM selection.
+#' @param short_iterations Integer. Number of EM iterations run for each
+#'   candidate start when `nstart > 1` (see `nstart`). Defaults to `5`.
+#'   Ignored when `nstart = 1` or `init != "rand.soft"`.
 #' @param start.z Optional \eqn{n \times k} numeric matrix of initial
 #'   component-membership probabilities.
 #' @param seed Optional integer. If provided, the RNG state is set at the
 #'   start of the fit and restored on exit for fully reproducible results.
+#' @param method Character string selecting the `gamlss` fitting algorithm
+#'   used in every M-step call: `"RS"` (Rigby and Stasinopoulos, default),
+#'   `"CG"` (Cole and Green), or `"mixed"`.
 #' @param verbose Logical. If `TRUE` (default), a progress bar is shown during EM iterations.
 #'
 #' @return An object of class `"gamlssCWM"`, which is a named list with
@@ -66,6 +81,14 @@
 #'       the convergence criterion.} 
 #'     \item{`call`}{The `formula` argument (stored for use by S3
 #'       methods).}
+#'     \item{`n_retained`}{A list with integer counts `fitX`, `fitY`, and
+#'       `total`: the number of M-step updates, summed over all EM
+#'       iterations, where the GEM safeguard rejected a candidate `fitX`
+#'       or `fitY` fit (because its weighted log-likelihood was lower
+#'       than the previous iterate's) and retained the previous fit
+#'       instead. A nonzero count is expected and harmless for families
+#'       with shape parameters (e.g. `PE()`, `BCPE()`) fitted via `"RS"`,
+#'       whose convergence is not strictly monotone cycle-to-cycle.}
 #'   }
 #'
 #' @seealso `predict.gamlssCWM`, `plot.gamlssCWM`, `summary.gamlssCWM`
@@ -112,7 +135,8 @@ gamlssCWM <- function(formula,
                       tol = 1e-3,
                       k,
                       nstart = 1,
-                      start.z = NULL, 
+                      short_iterations = 5,
+                      start.z = NULL,
                       seed = NULL,
                       method = "RS", 
                       verbose = TRUE
@@ -146,9 +170,15 @@ gamlssCWM <- function(formula,
     nstart < 1L || nstart != round(nstart)) {
     stop("'nstart' must be a positive integer.")
   }
+  if (!is.numeric(short_iterations) || length(short_iterations) != 1L ||
+    short_iterations < 1L || short_iterations != round(short_iterations)) {
+    stop("'short_iterations' must be a positive integer.")
+  }
   if (!inherits(famX, "gamlss.family") || !inherits(famY, "gamlss.family")) {
     stop("'famX' and 'famY' must be gamlss.family objects, e.g. NO().")
   }
+  validate_family_type(famX, "famX")
+  validate_family_type(famY, "famY")
   init <- match.arg(init, c("kmeans", "rand.soft", "manual"))
   method <- match.arg(method, c("RS", "CG", "mixed"))
   # --- end validation ---
@@ -187,22 +217,40 @@ gamlssCWM <- function(formula,
   M_out <- vector("list", length = max_iter)
 
   if(k > 1){
-    z <- matrix(NA, ncol = k, nrow = nrow(data))
+    # Restrict clustering-based initialization to the variables actually
+    # used in the model (avoids kmeans picking up unrelated columns that
+    # happen to be present in 'data').
+    init_data <- data[vars]
 
-    z <- cwm_init(
-      data = data,
-      mode = init,
-      k = k,
-      nstart = nstart,
-      famX = famX,
-      famY = famY,
-      start.z = start.z
-    )
+    if (init == "rand.soft" && nstart > 1) {
+      # Short-EM initialization (Biernacki, Celeux & Govaert, 2003): run
+      # 'nstart' short EM sequences of 'short_iterations' iterations each
+      # from independent random-soft starts, and keep the posterior matrix
+      # from the run attaining the highest observed-data log-likelihood.
+      z <- short_em_select(
+        data = data, formula = formula,
+        sigma_formula = sigma_formula, nu_formula = nu_formula, tau_formula = tau_formula,
+        famX = famX, famY = famY, k = k, nstart = nstart,
+        short_iterations = short_iterations, method = method
+      )
+    } else {
+      z <- cwm_init(
+        data = init_data,
+        mode = init,
+        k = k,
+        nstart = nstart,
+        famX = famX,
+        famY = famY,
+        start.z = start.z
+      )
+    }
   } else{
     z <- matrix(1, ncol = k, nrow = nrow(data))
   }
 
   converged <- FALSE
+  n_retained_fitX <- 0L
+  n_retained_fitY <- 0L
   if(verbose) pb <- txtProgressBar(min = 0, max = max_iter, style = 3)
 
   for (r in 1:max_iter) {
@@ -214,7 +262,7 @@ gamlssCWM <- function(formula,
         tau_formula = tau_formula,
         z = z, famX = famX, famY = famY,
         k = k, data = data,
-        prev_fits = NULL, 
+        prev_fits = NULL,
         method = method
       )
 
@@ -229,21 +277,28 @@ gamlssCWM <- function(formula,
         tau_formula = tau_formula,
         z = z, famX = famX, famY = famY,
         k = k, data = data,
-        prev_fits = M_out[[r - 1]]$fits, 
-        method = method 
+        prev_fits = M_out[[r - 1]]$fits,
+        method = method
       )
 
       loglik[r] <- compute_ll(M_out[[r]], data, formula, k)
       if (r >= 3) M_out[r - 2] <- list(NULL)
     }
+    n_retained_fitX <- n_retained_fitX + M_out[[r]]$n_retained$fitX
+    n_retained_fitY <- n_retained_fitY + M_out[[r]]$n_retained$fitY
 
     converged_now <- if (r >= 3) {
       denom <- loglik[r - 1] - loglik[r - 2]
       if (abs(denom) < .Machine$double.eps^0.5) {
         abs(loglik[r] - loglik[r - 1]) < tol # fallback: flat LL
       } else {
-        a_r <- loglik[r - 1] + (loglik[r] - loglik[r - 1]) / (1 - (loglik[r] - loglik[r - 1]) / denom)
-        abs(a_r - loglik[r]) < tol
+        a <- (loglik[r] - loglik[r - 1]) / denom
+        if (a >= 1) {
+          abs(loglik[r] - loglik[r - 1]) < tol # fallback: non-contractive Aitken ratio
+        } else {
+          a_r <- loglik[r - 1] + (loglik[r] - loglik[r - 1]) / (1 - a)
+          abs(a_r - loglik[r - 1]) < tol
+        }
       }
     } else {
       FALSE
@@ -276,7 +331,12 @@ gamlssCWM <- function(formula,
     loglik = loglik[r],
     ll_history = loglik[1:r],
     converged = converged,
-    call = formula
+    call = formula,
+    n_retained = list(
+      fitX = n_retained_fitX,
+      fitY = n_retained_fitY,
+      total = n_retained_fitX + n_retained_fitY
+    )
   )
 
   class(res) <- "gamlssCWM"
@@ -351,6 +411,10 @@ print.gamlssCWM <- function(x, digits = max(3L, getOption("digits") - 3L), ...) 
   if (!is.null(object$pi)) {
     pi_str <- paste(formatC(object$pi, format = "f", digits = digits), collapse = ", ")
     cat("Mixing proportions: ", pi_str, "\n", sep = "")
+  }
+
+  if (!is.null(object$n_retained) && object$n_retained$total > 0) {
+    cat("Retained fits (GEM safeguard): ", object$n_retained$total, "\n", sep = "")
   }
 
   cat("Component families:\n")
@@ -452,11 +516,7 @@ predict.gamlssCWM <- function(object, newdata, type = c("response", "posterior",
     }
 
     if (needs_mu) {
-      mu_y[, j] <- gamlss_predict_quiet(object$fits[[j]]$fitY,
-        what = "mu", newdata = newdata,
-        type = "response",
-        data = object$fits[[j]]$fitY$data
-      )
+      mu_y[, j] <- safe_predict_param(object$fits[[j]]$fitY, "mu", newdata, n_new)
     }
   }
 
@@ -505,6 +565,9 @@ predict.gamlssCWM <- function(object, newdata, type = c("response", "posterior",
 #' @param main Character string for the plot title.  Defaults to `""`.
 #' @param ylab Label for the \eqn{y}-axis.  Defaults to `"Y"`.
 #' @param xlab Label for the \eqn{x}-axis.  Defaults to `"X"`.
+#' @param legend Optional character string giving the position of a
+#'   legend that maps colors to component numbers, as in summary(), e.g.
+#'   "topleft". If NULL (default), no legend is drawn.
 #'
 #' @return Invisibly returns `NULL`.  Called for its side-effect of
 #'   producing a plot.
@@ -535,13 +598,20 @@ predict.gamlssCWM <- function(object, newdata, type = c("response", "posterior",
 #'   main = "Cluster-Weighted GAMLSS fit"
 #' )
 #'
-#' @importFrom graphics plot lines contour
+#' plot(fit,
+#'   dataX = df$x, dataY = df$y,
+#'   col = c("steelblue", "tomato"), pch = 16,
+#'   main = "Cluster-Weighted GAMLSS fit",
+#'   legend = "topleft"
+#' )
+#'
+#' @importFrom graphics plot lines contour legend
 #'
 #' @method plot gamlssCWM
 #' @export
 plot.gamlssCWM <- function(x, ..., dataX, dataY,
                            col = NULL, pch = 1, lwd = 2, contours = FALSE, drawlabels = FALSE,
-                           main = "", ylab = NULL, xlab = NULL) {
+                           main = "", ylab = NULL, xlab = NULL, legend = NULL) {
   object <- x
   length(object$fits) -> k
 
@@ -590,16 +660,7 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
     if(!any(data$lab == j)) next
     x_grid <- seq(min(data$x[data$lab == j]), max(data$x[data$lab == j]), length.out = 200)
     nd <- setNames(data.frame(x_grid), x_name)
-    mu_j <- try(
-      gamlss_predict_quiet(object$fits[[j]]$fitY,
-        what    = "mu",
-        newdata = nd,
-        type    = "response",
-        data    = object$fits[[j]]$fitY$data
-      ),
-      silent = TRUE
-    )
-    if (inherits(mu_j, "try-error")) next
+    mu_j <- safe_predict_param(object$fits[[j]]$fitY, "mu", nd, length(x_grid))
     lines(x_grid, mu_j, col = col[j], lwd = lwd)
   }
 
@@ -657,6 +718,17 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
 
       contour(x_grid, y_grid, z_mat_j, add = TRUE, col = col[j], lty = 2, drawlabels = drawlabels)
     }
+  }
+
+  if (is.null(legend) || isFALSE(legend)) {
+    # no legend
+  } else if (is.character(legend) && length(legend) == 1L) {
+    graphics::legend(legend,
+      legend = paste("Component", seq_len(k)),
+      col = col[seq_len(k)], pch = pch, lty = 1, lwd = lwd, bty = "n"
+    )
+  } else {
+    stop("'legend' must be NULL or a legend position string.")
   }
 }
 
@@ -789,6 +861,10 @@ summary.gamlssCWM <- function(object, ...) {
 
   pi_str <- paste(sprintf("%.4f", object$pi), collapse = ", ")
   cat("Mixing proportions   : ", pi_str, "\n", sep = "")
+
+  if (!is.null(object$n_retained) && object$n_retained$total > 0) {
+    cat("Retained fits (GEM safeguard): ", object$n_retained$total, "\n", sep = "")
+  }
   cat("\n")
 
   for (j in 1:k) {

@@ -15,26 +15,26 @@ str(ENRON)
 plot(ENRON, pch = 16, cex = .5)
 
 fit <- gamlssCWM(
-    formula       = UTILITY_index ~ poly(ENRON, 2),
+    formula       = UTILITY ~ poly(ENRON, 2, raw = TRUE),
     sigma_formula = ~ 1,
     data          = ENRON,
     famX          = gamlss.dist::PE(),
     famY          = gamlss.dist::NO(),
     init          = "kmeans",
     nstart        = 10,
-    max_iter      = 60,
+    max_iter      = 100,
     tol           = 1e-4,
     k             = 3,
-    verbose       = FALSE, 
+    verbose       = FALSE,
     seed          = 123
 )
 print(fit)
 
 summary(fit)
 
-plot(fit, dataX = ENRON, dataY = UTILITY_index, pch = 16, contours = TRUE)
+plot(fit, dataX = ENRON, dataY = UTILITY, pch = 16, contours = TRUE, legend = "topleft")
 
-persp(fit, dataX = ENRON, dataY = UTILITY_index, theta = 50, shade = 0.2)
+persp(fit, dataX = ENRON, dataY = UTILITY, theta = 50, shade = 0.2)
 
 
 #-------------------#
@@ -54,16 +54,17 @@ for (j in 1:length(k)) {
     fits[[j]] <- gamlssCWM(
       formula       = age.tweetgenie ~ age,
       sigma_formula = ~ 1,
-      data          = ELECTION,
-      famX          = gamlss.dist::PO(),
-      famY          = gamlss.dist::GA(),
-      init          = "rand.soft",
-      nstart        = 10,
-      max_iter      = 550, 
-      tol           = 1e-3,
-      k             = k[j], 
-      verbose       = FALSE,
-      seed          = 123
+      data             = ELECTION,
+      famX             = gamlss.dist::PO(),
+      famY             = gamlss.dist::GA(),
+      init             = "rand.soft",
+      nstart           = 10,
+      short_iterations = 5, 
+      max_iter         = 550, 
+      tol              = 1e-3,
+      k                = k[j], 
+      verbose          = FALSE,
+      seed             = 123
     )
     ICs[[j]] <- getIC(fits[[j]])
 }
@@ -99,15 +100,19 @@ fit <- gamlssCWM(
     formula       = age.tweetgenie ~ age,
     sigma_formula = ~ age,
     data          = ELECTION,
-    famX          = gamlss.dist::GPO(),
-    famY          = gamlss.dist::GAF(),
+    famX          = gamlss.dist::PO(),
+    famY          = gamlss.dist::GA(),
     init          = "manual",
     start.z       = fits[[3]]$posteriors,
     max_iter      = 120,
     tol           = 1e-3,
-    k             = 3, 
-    seed = 123
-) 
+    k             = 3,
+    verbose       = FALSE,
+    seed          = 123
+)
+
+print(fit)
+
 summary(fit)
 
-plot(fit, dataX = age, dataY = age.tweetgenie, pch = 16, cex = .4)
+plot(fit, dataX = age, dataY = age.tweetgenie, pch = 16, cex = .4, legend = "topleft")

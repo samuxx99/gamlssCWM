@@ -1,6 +1,7 @@
 ##' Enron Email Dataset (from rsafd)
 ##'
-##' Dati tratti dal pacchetto rsafd della Princeton University.
+##' Data taken from the \code{rsafd} package developed at Princeton
+##' University.
 ##'
 ##' @docType data
 ##' @format A data frame (or list) with email metadata and content as provided
@@ -14,20 +15,22 @@
 
 ##' Dutch Election Twitter Data (2012-2015)
 ##'
-##' Dataset basato sullo studio della predizione elettorale tramite Twitter e
-##' demografia. Include dati sulle elezioni parlamentari olandesi del 2012 e
-##' provinciali del 2015.
+##' Dataset based on the study of election prediction via Twitter and
+##' demographic data. Includes data on the 2012 Dutch parliamentary
+##' elections and the 2015 provincial elections.
 ##'
-##' I dati originali derivano da TNS-Nipo (demografia elettori), TwiNL (tweet),
-##' allepeilingen.com (sondaggi) e kiesraad.nl (risultati ufficiali). I metadati e
-##' la raccolta sono descritti in Sanders et al. (2016). L'uso di questi dati è
-##' autorizzato per questo pacchetto.
+##' The original data come from TNS-Nipo (voter demographics), TwiNL
+##' (tweets), allepeilingen.com (polls) and kiesraad.nl (official results).
+##' The metadata and data collection are described in Sanders et al. (2016).
+##' Permission to redistribute this data with the package was obtained
+##' directly from Erik Sanders via email correspondence.
 ##'
 ##' @docType data
 ##' @format A data frame with election, polling, demographic and Twitter-derived
 ##'   variables aggregated as in Sanders et al. (2016).
 ##' @source Sanders, E., de Gier, M., & van den Bosch, A. (2016). "Using Demographics
-##'   in Predicting Election Results with Twitter". Data obtained via personal
-##'   communication with the authors.
+##'   in Predicting Election Results with Twitter". Data obtained and
+##'   redistributed with permission from the authors, granted via email
+##'   correspondence with Erik Sanders.
 ##' @keywords datasets
 "ELECTION"
