@@ -38,11 +38,12 @@
 #' @param init Character string indicating the initialization strategy:
 #'   `"kmeans"` for hard *k*-means assignments on the raw `(x, y)` values
 #'   (works for discrete/count families too, since it only requires
-#'   numeric data), or `"rand.soft"` (default) for random row-normalised
-#'   weights.
+#'   numeric data), `"rand.soft"` (default) for random row-normalised
+#'   weights, or `"manual"` to supply the initial posterior probabilities
+#'   through `start.z`.
 #' @param max_iter Maximum number of EM iterations.
-#' @param tol Convergence tolerance on the absolute change in
-#'   log-likelihood between consecutive iterations.  Defaults to `1e-3`.
+#' @param tol Tolerance of the Aitken-based stopping rule (see Section 4.2).
+#'   Defaults to `1e-3`.
 #' @param k Integer. Number of mixture components.
 #' @param nstart Integer. Number of independent initializations to try
 #'   when `init = "rand.soft"`. When `nstart > 1`, a short-EM selection
@@ -150,6 +151,9 @@ gamlssCWM <- function(formula,
   }
   data <- as.data.frame(data)
   vars <- all.vars(formula)
+  if (length(vars) != 2L) {
+    stop("'formula' must have exactly one response and one covariate (bivariate CWM).")
+  }
   if (!all(vars %in% names(data))) {
     stop(
       "Variables in 'formula' not found in 'data': ",
@@ -190,7 +194,7 @@ gamlssCWM <- function(formula,
   )
 
   for (param in names(formulas_health)) {
-    has_formula <- deparse(formulas_health[[param]]) != "~1"
+    has_formula <- length(all.vars(formulas_health[[param]])) > 0L
     param_exists <- param %in% names(famY$parameters)
 
     if (has_formula && !param_exists) {
@@ -321,6 +325,11 @@ gamlssCWM <- function(formula,
     if(verbose) setTxtProgressBar(pb, r)
   }
 
+  if (!converged) {
+    if (verbose) close(pb)
+    warning(sprintf("EM did not converge within max_iter = %d iterations.", max_iter), call. = FALSE)
+  }
+
   last_M <- M_out[[r]]
   z <- E_step(last_M, data = data, k = k, formula = formula)
 
@@ -401,7 +410,7 @@ print.gamlssCWM <- function(x, digits = max(3L, getOption("digits") - 3L), ...) 
     cat("Number of observations: ", n_obs, "\n", sep = "")
   }
   if (!is.null(object$loglik)) {
-    cat("Final log-likelihood: ", format(signif(object$loglik, digits = digits)), "\n", sep = "")
+    cat("Final log-likelihood: ", format(round(object$loglik, digits = digits)), "\n", sep = "")
   }
   if (!is.na(n_iter)) {
     cat("EM iterations: ", n_iter, "\n", sep = "")
@@ -442,8 +451,8 @@ print.gamlssCWM <- function(x, digits = max(3L, getOption("digits") - 3L), ...) 
 #'   variables for the new observations.
 #' @param type Character string specifying the type of prediction:
 #'   \describe{
-#'     \item{`"response"`}{(default) The posterior-weighted expected value
-#'       of \eqn{Y}, i.e. \eqn{\sum_j \hat{p}_{ij} \hat{\mu}_{ij}}.}
+#'     \item{`"response"`}{(default) The posterior-weighted location
+#'       parameter \eqn{\mu}, i.e. \eqn{\sum_j \hat{p}_{ij} \hat{\mu}_{ij}}.}
 #'     \item{`"posterior"`}{An \eqn{n \times k} matrix of posterior
 #'       component-membership probabilities based on the marginal density
 #'       of \eqn{X} only.}
