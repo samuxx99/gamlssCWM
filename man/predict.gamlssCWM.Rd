@@ -15,8 +15,8 @@ variables for the new observations.}
 
 \item{type}{Character string specifying the type of prediction:
 \describe{
-\item{\code{"response"}}{(default) The posterior-weighted expected value
-of \eqn{Y}, i.e. \eqn{\sum_j \hat{p}_{ij} \hat{\mu}_{ij}}.}
+\item{\code{"response"}}{(default) The posterior-weighted location
+parameter \eqn{\mu}, i.e. \eqn{\sum_j \hat{p}_{ij} \hat{\mu}_{ij}}.}
 \item{\code{"posterior"}}{An \eqn{n \times k} matrix of posterior
 component-membership probabilities based on the marginal density
 of \eqn{X} only.}

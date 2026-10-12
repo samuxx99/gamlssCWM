@@ -3,23 +3,38 @@
 \docType{data}
 \name{ENRON}
 \alias{ENRON}
-\title{Enron Email Dataset (from rsafd)}
+\title{ENRON and utility sector indices}
 \format{
-A data frame (or list) with email metadata and content as provided
-by the original rsafd distribution. Fields and structure follow the
-original rsafd dataset.
+A data frame with 260 rows and 2 numeric variables:
+\describe{
+\item{ENRON}{Daily value of the ENRON stock index.}
+\item{UTILITY}{Daily value of an aggregate utility sector index.}
+}
 }
 \source{
-\url{https://github.com/princetonuniversity/rsafd}
+Carmona, R. (2025). \pkg{Rsafd}: Statistical Analysis of Financial
+Data in R. R package version 1.0.1,
+\url{https://github.com/PrincetonUniversity/Rsafd}, data frame
+\code{UTIL.index}. Distributed under the MIT license,
+Copyright (c) 2025 PrincetonUniversity; see \file{inst/COPYRIGHTS}.
 }
 \usage{
 ENRON
 }
 \description{
-Data taken from the \code{rsafd} package developed at Princeton
-University.
+Daily values of the ENRON stock index and of an aggregate utility sector
+index over the 260 trading days of 1993 (4 January to 31 December).
 }
-\note{
-Original dataset license: MIT.
+\details{
+The data are the columns \code{ENRON.index} and \code{UTILITY.index}
+of the data frame \code{UTIL.index} distributed with the \pkg{Rsafd}
+package, which accompanies Carmona (2014). The two columns have been
+renamed and the row names (dates) dropped; the third column of
+\code{UTIL.index}, \code{DUKE.index}, is not included.
+}
+\references{
+Carmona, R. (2014). \emph{Statistical Analysis of Financial
+Data in R}, 2nd edition. Springer, New York.
+\doi{10.1007/978-1-4614-8788-3}
 }
 \keyword{datasets}

@@ -3,30 +3,37 @@
 \docType{data}
 \name{ELECTION}
 \alias{ELECTION}
-\title{Dutch Election Twitter Data (2012-2015)}
+\title{Annotated age and TweetGenie age estimate for Twitter accounts}
 \format{
-A data frame with election, polling, demographic and Twitter-derived
-variables aggregated as in Sanders et al. (2016).
+A data frame with 1956 rows and 2 variables:
+\describe{
+\item{age.tweetgenie}{Numeric. Age in years estimated by TweetGenie.}
+\item{age}{Integer. Age in years assigned by a human annotator.}
+}
 }
 \source{
-Sanders, E., de Gier, M., & van den Bosch, A. (2016). "Using Demographics
-in Predicting Election Results with Twitter". Data obtained and
-redistributed with permission from the authors, granted via email
-correspondence with Erik Sanders.
+Anonymised data provided by Eric Sanders (Radboud University),
+personal communication, 2 March 2026, in response to a request to include
+them in this package.
 }
 \usage{
 ELECTION
 }
 \description{
-Dataset based on the study of election prediction via Twitter and
-demographic data. Includes data on the 2012 Dutch parliamentary
-elections and the 2015 provincial elections.
+Anonymised records of Twitter accounts from the study of Sanders et al.
+(2016), pairing the age assigned by a human annotator with the age
+estimated by the TweetGenie tool.
 }
 \details{
-The original data come from TNS-Nipo (voter demographics), TwiNL
-(tweets), allepeilingen.com (polls) and kiesraad.nl (official results).
-The metadata and data collection are described in Sanders et al. (2016).
-Permission to redistribute this data with the package was obtained
-directly from Erik Sanders via email correspondence.
+Each row is one annotation record, not one account: accounts annotated by
+more than one annotator appear in more than one row (Sanders et al. (2016)
+analyse 1,815 accounts, whereas this data frame has 1,956 rows). The
+values of \code{age} are human judgements, not verified ages.
+}
+\references{
+Sanders, E., de Gier, M., and van den Bosch, A. (2016). Using
+demographics in predicting election results with Twitter. In
+\emph{Social Informatics}, Lecture Notes in Computer Science,
+pp. 259--268. Springer. \doi{10.1007/978-3-319-47874-6_18}
 }
 \keyword{datasets}

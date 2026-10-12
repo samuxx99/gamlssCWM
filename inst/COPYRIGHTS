@@ -31,6 +31,7 @@ SOFTWARE.
 
 Dataset ELECTION (data/ELECTION.rda)
 ------------------------------------
-Anonymised subset of the data of Sanders, E., de Gier, M. and van den Bosch, A.
-(2016), provided by Eric Sanders and redistributed with his permission.
-(Replace with the exact terms once his written reply is received.)
+Anonymised data provided by Eric Sanders (Radboud University), personal communication,
+2 March 2026, in response to a request to include them in this package. Source study:
+Sanders, E., de Gier, M. and van den Bosch, A. (2016). No licence terms were specified
+by the data provider.

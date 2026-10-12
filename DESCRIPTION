@@ -19,8 +19,6 @@ Authors@R: c(
   person("Eric", "Sanders", role = "dtc",
          comment = "ELECTION data")
   )
-Author: Samuele Aglieco [aut, cre], Antonio Punzo [ctb]
-Maintainer: Samuele Aglieco <samuele.aglieco@ucdconnect.ie>
 Description: Fits bivariate Cluster-Weighted Models (CWM) where each
     component is described by a pair of Generalized Additive Models for
     Location, Scale and Shape (GAMLSS) distributions — one for the covariate
@@ -28,8 +26,10 @@ Description: Fits bivariate Cluster-Weighted Models (CWM) where each
     via the Expectation-Maximisation (EM) algorithm. The package provides
     S3 methods for summarising, predicting and plotting fitted models, as
     well as contour visualisation of the mixture density.
-License: GPL-3
+License: GPL (>= 2)
 Copyright: inst/COPYRIGHTS
+URL: https://github.com/samuxx99/gamlssCWM
+BugReports: https://github.com/samuxx99/gamlssCWM/issues
 Encoding: UTF-8
 LazyData: true
 Depends:

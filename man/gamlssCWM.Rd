@@ -50,13 +50,14 @@ distribution of \eqn{Y | X} (e.g. \code{\link[gamlss.dist:NO]{gamlss.dist::NO()}
 \item{init}{Character string indicating the initialization strategy:
 \code{"kmeans"} for hard \emph{k}-means assignments on the raw \verb{(x, y)} values
 (works for discrete/count families too, since it only requires
-numeric data), or \code{"rand.soft"} (default) for random row-normalised
-weights.}
+numeric data), \code{"rand.soft"} (default) for random row-normalised
+weights, or \code{"manual"} to supply the initial posterior probabilities
+through \code{start.z}.}
 
 \item{max_iter}{Maximum number of EM iterations.}
 
-\item{tol}{Convergence tolerance on the absolute change in
-log-likelihood between consecutive iterations.  Defaults to \code{1e-3}.}
+\item{tol}{Tolerance of the Aitken-based stopping rule (see Section 4.2).
+Defaults to \code{1e-3}.}
 
 \item{k}{Integer. Number of mixture components.}
 

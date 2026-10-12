@@ -86,4 +86,4 @@ post  <- predict(fit, newdata = df, type = "posterior")
 
 ## License
 
-GPL-3
+GPL (>= 2)

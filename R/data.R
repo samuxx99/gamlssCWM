@@ -42,8 +42,9 @@
 ##'   \item{age.tweetgenie}{Numeric. Age in years estimated by TweetGenie.}
 ##'   \item{age}{Integer. Age in years assigned by a human annotator.}
 ##' }
-##' @source Anonymised data kindly provided by Eric Sanders and redistributed
-##'   with his permission.
+##' @source Anonymised data provided by Eric Sanders (Radboud University),
+##'   personal communication, 2 March 2026, in response to a request to include
+##'   them in this package.
 ##' @references Sanders, E., de Gier, M., and van den Bosch, A. (2016). Using
 ##'   demographics in predicting election results with Twitter. In
 ##'   \emph{Social Informatics}, Lecture Notes in Computer Science,
