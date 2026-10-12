@@ -1,9 +1,0 @@
-ENRON.rda
-Derived from the rsafd collection by Princeton University (https://github.com/princetonuniversity/rsafd).
-Original license: MIT. Included in this package under the same terms.
-
-ELECTION.rda
-Based on the dataset and study: Sanders, E., de Gier, M., & van den Bosch, A. (2016),
-"Using Demographics in Predicting Election Results with Twitter". Data were
-obtained via personal communication with the authors and are included here with
-their permission for use within this package.

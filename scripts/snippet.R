@@ -7,6 +7,7 @@
 # ENRON tutorial #
 #----------------#
 
+# library("gamlssCWM")
 devtools::load_all()
 data("ENRON", package = "gamlssCWM")
 attach(ENRON)
@@ -116,3 +117,6 @@ print(fit)
 summary(fit)
 
 plot(fit, dataX = age, dataY = age.tweetgenie, pch = 16, cex = .4, legend = "topleft")
+
+
+sessionInfo()
