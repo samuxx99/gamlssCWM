@@ -47,6 +47,11 @@
 
 \item{...}{Additional arguments passed to \code{\link[graphics]{persp}}.}
 }
+\value{
+Called for its side effect, the perspective plot. Invisibly returns
+the \eqn{4 \times 4} viewing transformation matrix returned by
+\code{\link[graphics]{persp}}.
+}
 \description{
 Creates a 3D perspective plot (\code{persp}) of the joint density
 estimated by a fitted \code{gamlssCWM} object.

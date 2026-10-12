@@ -14,3 +14,10 @@
 ^R/\.RDataTmp$
 ^scripts$
 ^.*\.tar\.gz$
+^cran-comments\.md$
+^REPORT\.md$
+^code\.R$
+^code\.html$
+^figure$
+^\.gitignore$
+^.*\.log$

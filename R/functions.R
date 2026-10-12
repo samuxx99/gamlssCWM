@@ -760,6 +760,10 @@ plot.gamlssCWM <- function(x, ..., dataX, dataY,
 #' @param main Character string specifying the main title.
 #' @param ... Additional arguments passed to \code{\link[graphics]{persp}}.
 #'
+#' @return Called for its side effect, the perspective plot. Invisibly returns
+#'   the \eqn{4 \times 4} viewing transformation matrix returned by
+#'   \code{\link[graphics]{persp}}.
+#'
 #' @seealso \code{plot.gamlssCWM}
 #'
 #' @importFrom graphics persp
