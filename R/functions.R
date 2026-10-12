@@ -1085,4 +1085,4 @@ coef.gamlssCWM <- function(object, ...) {
   
   res$components <- comp_list
   return(res)
-}
+}  
