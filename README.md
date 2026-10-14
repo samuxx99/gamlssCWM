@@ -84,6 +84,10 @@ post  <- predict(fit, newdata = df, type = "posterior")
 * [`gamlss.dist`](https://CRAN.R-project.org/package=gamlss.dist) (≥ 5.0.0)
 * `graphics`, `stats`, `utils` (base R)
 
+## Data
+
+The package includes two datasets. `ENRON` is derived from the 'Rsafd' package (MIT licence). `ELECTION` is by Eric Sanders (Radboud University), with TweetGenie age estimates by Dong Nguyen (Utrecht University), redistributed under CC BY 4.0 with their permission. See `inst/COPYRIGHTS`.
+
 ## License
 
 GPL (>= 2)

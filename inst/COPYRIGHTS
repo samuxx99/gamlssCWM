@@ -31,7 +31,10 @@ SOFTWARE.
 
 Dataset ELECTION (data/ELECTION.rda)
 ------------------------------------
-Anonymised data provided by Eric Sanders (Radboud University), personal communication,
-2 March 2026, in response to a request to include them in this package. Source study:
-Sanders, E., de Gier, M. and van den Bosch, A. (2016). No licence terms were specified
-by the data provider.
+Data by Eric Sanders (Radboud University); TweetGenie age estimates provided by
+Dong Nguyen (Utrecht University). Redistributed under the Creative Commons
+Attribution 4.0 International licence (CC BY 4.0,
+https://creativecommons.org/licenses/by/4.0/) with their permission (personal
+communication). Source study: Sanders, E., de Gier, M. and van den Bosch, A.
+(2016). Changes made: only the columns age and age.tweetgenie were selected
+(and renamed), and the data were anonymised.

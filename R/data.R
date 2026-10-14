@@ -35,16 +35,29 @@
 ##' Each row is one annotation record, not one account: accounts annotated by
 ##' more than one annotator appear in more than one row (Sanders et al. (2016)
 ##' analyse 1,815 accounts, whereas this data frame has 1,956 rows). The
-##' values of \code{age} are human judgements, not verified ages.
+##' values of \code{age} are human judgements, not verified ages. The 1,815
+##' accounts of Sanders et al. (2016) result from excluding non-human accounts
+##' and accounts annotated by neither the annotator nor TweetGenie.
+##'
+##' All ages are estimates: an age or birthday stated in the profile, or an age
+##' guessed from the profile picture; the time reference of these ages is
+##' unknown.
+##'
+##' The data are redistributed under the Creative Commons Attribution 4.0
+##' International licence (CC BY 4.0,
+##' \url{https://creativecommons.org/licenses/by/4.0/}). Changes made: only
+##' the columns \code{age} and \code{age.tweetgenie} were selected (and
+##' renamed), and the data were anonymised.
 ##'
 ##' @format A data frame with 1956 rows and 2 variables:
 ##' \describe{
 ##'   \item{age.tweetgenie}{Numeric. Age in years estimated by TweetGenie.}
 ##'   \item{age}{Integer. Age in years assigned by a human annotator.}
 ##' }
-##' @source Anonymised data provided by Eric Sanders (Radboud University),
-##'   personal communication, 2 March 2026, in response to a request to include
-##'   them in this package.
+##' @source Anonymised data provided by Eric Sanders (Radboud University);
+##'   TweetGenie age estimates provided by Dong Nguyen (Utrecht University).
+##'   Redistributed under CC BY 4.0 with their permission (personal
+##'   communication); see \file{inst/COPYRIGHTS}.
 ##' @references Sanders, E., de Gier, M., and van den Bosch, A. (2016). Using
 ##'   demographics in predicting election results with Twitter. In
 ##'   \emph{Social Informatics}, Lecture Notes in Computer Science,

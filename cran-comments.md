@@ -14,4 +14,4 @@ Checked locally with `R CMD check --as-cran` (R 4.5.1, macOS, aarch64-apple-darw
 ## Data provenance
 
 * `ENRON` is derived from the 'Rsafd' package (MIT licence); see `inst/COPYRIGHTS`.
-* `ELECTION` was provided by Eric Sanders (Radboud University) by personal communication; see `inst/COPYRIGHTS`.
+* `ELECTION` was provided by Eric Sanders (Radboud University), with TweetGenie age estimates provided by Dong Nguyen (Utrecht University); both gave permission (personal communication) to redistribute it under CC BY 4.0; see `inst/COPYRIGHTS`.

@@ -17,7 +17,9 @@ Authors@R: c(
   person("Princeton University", role = "cph",
          comment = "Rsafd, source of ENRON data"),
   person("Eric", "Sanders", role = "dtc",
-         comment = "ELECTION data")
+         comment = "ELECTION data"),
+  person("Dong", "Nguyen", role = "dtc",
+         comment = "TweetGenie age estimates in ELECTION")
   )
 Description: Fits bivariate Cluster-Weighted Models (CWM) where each
     component is described by a pair of Generalized Additive Models for
