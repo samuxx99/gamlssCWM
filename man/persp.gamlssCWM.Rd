@@ -56,6 +56,21 @@ the \eqn{4 \times 4} viewing transformation matrix returned by
 Creates a 3D perspective plot (\code{persp}) of the joint density
 estimated by a fitted \code{gamlssCWM} object.
 }
+\examples{
+library(gamlss.dist)
+set.seed(42)
+n <- 200
+x <- c(rnorm(n / 2, -2), rnorm(n / 2, 2))
+y <- c(
+  1 + 0.8 * x[1:(n / 2)] + rnorm(n / 2, sd = 0.5),
+  -1 - 0.8 * x[(n / 2 + 1):n] + rnorm(n / 2, sd = 0.5)
+)
+df <- data.frame(x = x, y = y)
+fit <- gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(),
+                 k = 2, max_iter = 50, verbose = FALSE)
+persp(fit, dataX = df$x, dataY = df$y)
+
+}
 \seealso{
 \code{plot.gamlssCWM}
 }

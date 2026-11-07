@@ -22,3 +22,18 @@ Computes several information criteria for model selection, including AIC,
 BIC, and the Integrated Complete-data Likelihood (ICL), which is
 particularly useful in mixture models.
 }
+\examples{
+library(gamlss.dist)
+set.seed(42)
+n <- 200
+x <- c(rnorm(n / 2, -2), rnorm(n / 2, 2))
+y <- c(
+  1 + 0.8 * x[1:(n / 2)] + rnorm(n / 2, sd = 0.5),
+  -1 - 0.8 * x[(n / 2 + 1):n] + rnorm(n / 2, sd = 0.5)
+)
+df <- data.frame(x = x, y = y)
+fit <- gamlssCWM(y ~ x, data = df, famX = NO(), famY = NO(),
+                 k = 2, max_iter = 50, verbose = FALSE)
+getIC(fit)
+
+}
