@@ -2,13 +2,23 @@
 
 This is a new submission.
 
+## Test environments
+
+* local macOS (aarch64-apple-darwin20), R 4.5.1: 0 errors | 0 warnings | 0 notes
+  (apart from "New submission" with incoming checks, and a local-only HTML Tidy
+  note: "Skipping checking HTML validation: 'tidy' doesn't look like recent
+  enough HTML Tidy.")
+* win-builder, R-devel (2026-11-06 r90845 ucrt): 1 NOTE (see below)
+
 ## R CMD check results
 
-Checked locally with `R CMD check --as-cran` (R 4.5.1, macOS, aarch64-apple-darwin20):
-0 errors | 0 warnings | 2 notes
+0 errors | 0 warnings | 1 note
 
-* NOTE: "New submission" (maintainer: Samuele Aglieco). This is expected for a first submission. The URLs in DESCRIPTION (`URL`, `BugReports`) are reachable and pass `urlchecker::url_check()`.
-* NOTE (local only): "Skipping checking HTML validation: 'tidy' doesn't look like recent enough HTML Tidy."
+* This is a new submission (maintainer: Samuele Aglieco).
+* "Possibly misspelled words in DESCRIPTION": CWM (acronym for
+  cluster-weighted model) and the surnames of cited authors
+  (Ingrassia, Minotti, Vittadini, Rigby, Stasinopoulos). All are
+  intentional.
 
 ## Data provenance
 
