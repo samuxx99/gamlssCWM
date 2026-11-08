@@ -13,7 +13,8 @@ Authors@R: c(
     person(
     given = "Antonio",
     family = "Punzo",
-    role = "ctb"
+    role = "ctb",
+    comment = c(ORCID = "0000-0001-7742-1821")
   )
   )
 Description: Fits bivariate Cluster-Weighted Models (CWM) where each
